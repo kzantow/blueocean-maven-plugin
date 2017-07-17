@@ -4,7 +4,7 @@
 
     <groupId>io.jenkins.blueocean</groupId>
     <artifactId>blueocean-maven-plugin</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.1-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
     <name>Blue Ocean Maven Plugin</name>
