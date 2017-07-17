@@ -66,7 +66,7 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
             for (MavenArtifact artifact : artifacts) {
                 List<Contents> jarEntries = findJarEntries(artifact.getFile().toURI(), "package.json");
 
-                getLog().debug("Using artifact: " + artifact.getArtifactId());
+                if (getLog().isDebugEnabled()) getLog().debug("Using artifact: " + artifact.getArtifactId());
 
                 JSONObject packageJson = JSONObject.fromObject(new String(jarEntries.get(0).data));
 
@@ -135,14 +135,14 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
     @Nonnull
     private List<Contents> findJarEntries(@Nonnull URI jarFile, @Nonnull String pathGlob) throws IOException {
         URL jarUrl = jarFile.toURL();
-        getLog().debug("Looking for " + pathGlob + " in " + jarFile + " with url: " + jarUrl);
+        if (getLog().isDebugEnabled()) getLog().debug("Looking for " + pathGlob + " in " + jarFile + " with url: " + jarUrl);
         List<Contents> out = new ArrayList<>();
         Pattern matcher = Pattern.compile(
             ("\\Q" + pathGlob.replace("**", "\\E\\Q").replace("*", "\\E[^/]*\\Q").replace("\\E\\Q", "\\E.*\\Q") + "\\E").replace("\\Q\\E", "")
         );
         try (ZipInputStream jar = new ZipInputStream(jarUrl.openStream())) {
             for (ZipEntry entry; (entry = jar.getNextEntry()) != null;) {
-                getLog().debug("Entry: " + entry.getName() + ", matches: " + matcher.matcher(entry.getName()).matches());
+                if (getLog().isDebugEnabled()) getLog().debug("Entry: " + entry.getName() + ", matches: " + matcher.matcher(entry.getName()).matches());
                 if (matcher.matcher(entry.getName()).matches()) {
                     out.add(new Contents(entry.getName(), IOUtils.toByteArray(jar)));
                 }
@@ -159,7 +159,7 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
         boolean isLocalProject = node.getArtifact().equals(project.getArtifact());
         try {
             if (!isLocalProject) { // not the local project
-                getLog().debug("Testing artifact for Blue Ocean plugins: " + artifact.toString());
+                if (getLog().isDebugEnabled()) getLog().debug("Testing artifact for Blue Ocean plugins: " + artifact.toString());
                 List<Contents> jarEntries = findJarEntries(artifact.getFile().toURI(), "package.json");
                 if (jarEntries.size() > 0) {
                     getLog().info("Adding upstream Blue Ocean plugin: " + artifact.toString());
