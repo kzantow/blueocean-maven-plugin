@@ -132,6 +132,7 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Default</threshold>
+                    <fork>false</fork>
                     <xmlOutput>true</xmlOutput>
                     <findbugsXmlOutput>false</findbugsXmlOutput>
                     <excludeFilterFile>${project.basedir}/findbugs-excludes.xml</excludeFilterFile>
