@@ -17,7 +17,7 @@
     
     <scm>
         <connection>scm:git:https://github.com/jenkinsci/blueocean-maven-plugin.git</connection>
-        <developerConnection>scm:git:https://github.com/jenkinsci/blueocean-maven-plugin.git</developerConnection>
+        <developerConnection>scm:git:git@github.com:jenkinsci/blueocean-maven-plugin.git</developerConnection>
         <url>https://github.com/jenkinsci/blueocean-maven-plugin</url>
         <tag>HEAD</tag>
     </scm>
