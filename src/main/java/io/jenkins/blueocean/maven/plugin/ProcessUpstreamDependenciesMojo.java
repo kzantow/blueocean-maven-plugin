@@ -60,7 +60,9 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
             File nodeModulesOutputDir = nodeModulesDirectory;
 
             if (!nodeModulesOutputDir.exists()) {
-                nodeModulesOutputDir.mkdirs();
+                if (!nodeModulesOutputDir.mkdirs()) {
+                    throw new MojoExecutionException("Unable to make node_modules directory: " + nodeModulesOutputDir.getCanonicalPath());
+                }
             }
 
             for (MavenArtifact artifact : artifacts) {
@@ -68,7 +70,7 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
 
                 if (getLog().isDebugEnabled()) getLog().debug("Using artifact: " + artifact.getArtifactId());
 
-                JSONObject packageJson = JSONObject.fromObject(new String(jarEntries.get(0).data));
+                JSONObject packageJson = JSONObject.fromObject(new String(jarEntries.get(0).data, "utf-8"));
 
                 String name = packageJson.getString("name");
                 String[] subdirs = name.split("/");
@@ -82,7 +84,9 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                 long artifactLastModified = artifactFile.lastModified();
 
                 if (!outDir.exists()) {
-                    outDir.mkdirs();
+                    if (!outDir.mkdirs()) {
+                        throw new MojoExecutionException("Unable to make module output directory: " + outDir.getCanonicalPath());
+                    }
                 }
 
                 try (ZipInputStream jar = new ZipInputStream(new FileInputStream(artifact.getFile()))) {
@@ -96,7 +100,9 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                             getLog().debug("Copying module: " + outFile.getAbsolutePath());
                             File parentFile = outFile.getParentFile();
                             if (!parentFile.exists()) {
-                                parentFile.mkdirs();
+                                if (!parentFile.mkdirs()) {
+                                    throw new MojoExecutionException("Unable to make parent directory for: " + outFile.getCanonicalPath());
+                                }
                             }
                             try (FileOutputStream out = new FileOutputStream(outFile)) {
                                 int read = 0;
@@ -119,9 +125,9 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
     /**
      * Simple file as a byte array
      */
-    private static class Contents {
-        String fileName;
-        byte[] data;
+    protected static class Contents {
+        public final String fileName;
+        public final byte[] data;
         
         Contents(@Nonnull String fileName, @Nonnull byte[] data) {
             this.fileName = fileName;

@@ -14,6 +14,34 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+    
+    <scm>
+        <connection>scm:git:https://github.com/jenkinsci/blueocean-maven-plugin.git</connection>
+        <developerConnection>scm:git:https://github.com/jenkinsci/blueocean-maven-plugin.git</developerConnection>
+        <url>https://github.com/jenkinsci/blueocean-maven-plugin</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <developers>
+        <developer>
+            <id>kzantow</id>
+            <name>Keith Zantow</name>
+        </developer>
+    </developers>
+
+    <repositories>
+        <repository>
+            <id>repo.jenkins-ci.org</id>
+            <url>http://repo.jenkins-ci.org/public/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>repo.jenkins-ci.org</id>
+            <url>http://repo.jenkins-ci.org/public/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -93,6 +121,28 @@
                         <id>help-goal</id>
                         <goals>
                             <goal>helpmojo</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>findbugs-maven-plugin</artifactId>
+                <version>3.0.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Default</threshold>
+                    <fork>false</fork>
+                    <xmlOutput>true</xmlOutput>
+                    <findbugsXmlOutput>false</findbugsXmlOutput>
+                    <excludeFilterFile>${project.basedir}/findbugs-excludes.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>analyze-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>
