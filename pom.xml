@@ -134,7 +134,7 @@
                     <threshold>Default</threshold>
                     <xmlOutput>true</xmlOutput>
                     <findbugsXmlOutput>false</findbugsXmlOutput>
-                    <excludeFilterFile>${basedir}/findbugs-excludes.xml</excludeFilterFile>
+                    <excludeFilterFile>${project.basedir}/findbugs-excludes.xml</excludeFilterFile>
                 </configuration>
                 <executions>
                     <execution>
