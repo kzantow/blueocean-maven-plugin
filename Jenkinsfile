@@ -4,11 +4,11 @@ pipeline {
         stage('Build & Test') {
             agent {
                 docker {
-                    image 'maven:3.5.0-jdk-8-alpine'
+                    image 'cloudbees/java-build-tools'
                 }
             }
             steps {
-                sh 'mvn package -s settings-azure.xml'
+                sh 'mvn package'
             }
         }
     }
