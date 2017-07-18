@@ -8,6 +8,8 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+                sh 'find . -type f'
+                sh 'cat findbugs-excludes.xml'
                 sh 'mvn compile'
             }
         }
