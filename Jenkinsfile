@@ -12,7 +12,8 @@ pipeline {
                 sh 'mvn package'
             }
         }
-        stage('Publish') {
+        /*
+        stage('Release') {
             agent {
                 docker {
                     image 'maven:3.5.0-jdk-8-alpine'
@@ -20,9 +21,10 @@ pipeline {
                 }
             }
             steps {
-                input message: 'Release', ok: 'Go!'
-                sh 'mvn install'
+                input message: 'Release?', ok: 'Go!'
+                sh 'mvn release:prepare release:perform'
             }
         }
+        */
     }
 }
