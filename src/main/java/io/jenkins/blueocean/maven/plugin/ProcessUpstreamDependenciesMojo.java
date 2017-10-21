@@ -53,9 +53,21 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
      */
     @Override
     public void execute() throws MojoExecutionException {
+        // Skip non-js projects
+        if (!new File(baseDir, "package.json").canRead()) {
+            getLog().info("Skipping blueocean dependency install for non-js project: " + project.getArtifactId());
+            return;
+        }
+
+        long start = System.currentTimeMillis();
         List<MavenArtifact> artifacts = new ArrayList<>();
         try {
             collectBlueoceanDependencies(graphBuilder.buildDependencyGraph(project, null), artifacts);
+
+            if (artifacts.isEmpty()) {
+                getLog().info("No upstream blueocean dependencies found for: " + project.getArtifactId());
+                return;
+            }
 
             File nodeModulesOutputDir = nodeModulesDirectory;
 
@@ -65,10 +77,10 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                 }
             }
 
+            getLog().info("Installing upstream dependencies...");
+
             for (MavenArtifact artifact : artifacts) {
                 List<Contents> jarEntries = findJarEntries(artifact.getFile().toURI(), "package.json");
-
-                if (getLog().isDebugEnabled()) getLog().debug("Using artifact: " + artifact.getArtifactId());
 
                 JSONObject packageJson = JSONObject.fromObject(new String(jarEntries.get(0).data, "utf-8"));
 
@@ -89,6 +101,9 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                     }
                 }
 
+                int read = 0;
+                byte[] buf = new byte[1024*8];
+
                 try (ZipInputStream jar = new ZipInputStream(new FileInputStream(artifact.getFile()))) {
                     ZipEntry entry;
                     while ((entry = jar.getNextEntry()) != null) {
@@ -97,7 +112,7 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                         }
                         File outFile = new File(outDir, entry.getName());
                         if (!outFile.exists() || outFile.lastModified() < artifactLastModified) {
-                            getLog().debug("Copying module: " + outFile.getAbsolutePath());
+                            if (getLog().isDebugEnabled()) getLog().debug("Copying file: " + outFile.getAbsolutePath());
                             File parentFile = outFile.getParentFile();
                             if (!parentFile.exists()) {
                                 if (!parentFile.mkdirs()) {
@@ -105,8 +120,6 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                                 }
                             }
                             try (FileOutputStream out = new FileOutputStream(outFile)) {
-                                int read = 0;
-                                byte[] buf = new byte[4096];
                                 while ((read = jar.read(buf)) >= 0) {
                                     out.write(buf, 0, read);
                                 }
@@ -119,7 +132,7 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
             throw new RuntimeException(e);
         }
 
-        getLog().debug("Done installing blueocean dependencies for " + project.getArtifactId());
+        getLog().info("Done installing blueocean dependencies for " + project.getArtifactId() + " in " + (System.currentTimeMillis() - start) + "ms");
     }
 
     /**

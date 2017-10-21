@@ -17,6 +17,6 @@ public class TestNoDependencies {
     public void test() throws Exception {
         File cwd = new File(System.getProperty("user.dir"));
         File node_modules = new File(cwd, "node_modules");
-        assert node_modules.list().length == 0 : "Should not have anything in node_modules";
+        assert !node_modules.exists() || node_modules.list().length == 0 : "Should not have anything in node_modules";
     }
 }

@@ -166,11 +166,14 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-invoker-plugin</artifactId>
-                <version>1.7</version>
+                <version>3.0.1</version>
                 <configuration>
                     <projectsDirectory>src/it</projectsDirectory>
                     <debug>true</debug>
                     <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
+                    <setupIncludes>
+                        <setupInclude>0-upstream-1/pom.xml</setupInclude>
+                    </setupIncludes>
                     <pomIncludes>
                         <pomInclude>*/pom.xml</pomInclude>
                     </pomIncludes>
