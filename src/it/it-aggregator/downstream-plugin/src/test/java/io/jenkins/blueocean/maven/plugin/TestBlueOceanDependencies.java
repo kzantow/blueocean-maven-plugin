@@ -15,7 +15,7 @@ public class TestBlueOceanDependencies {
         File node_modules = new File(cwd, "node_modules");
         List<String> files = Arrays.asList(node_modules.list());
         System.out.println(node_modules.getPath() + " list: " + files);
-        Assert files.size() > 0 : "Should have entries in node_modules";
+        assert files.size() > 0 : "Should have entries in node_modules";
         assert files.contains("@jenkins-cd") : "Should have upstream-1 / @jenkins-cd";
         assert files.contains("upstream-2") : "Should have upstream-2";
     }
