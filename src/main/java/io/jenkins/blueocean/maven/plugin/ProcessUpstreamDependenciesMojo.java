@@ -1,18 +1,6 @@
 package io.jenkins.blueocean.maven.plugin;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import javax.annotation.Nonnull;
-
+import net.sf.json.JSONObject;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -24,8 +12,28 @@ import org.apache.maven.shared.dependency.graph.DependencyNode;
 import org.jenkinsci.maven.plugins.hpi.AbstractJenkinsMojo;
 import org.jenkinsci.maven.plugins.hpi.MavenArtifact;
 
-import net.sf.json.JSONObject;
-import org.apache.commons.io.IOUtils;
+import javax.annotation.Nonnull;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * Goal which copies upstream Blue Ocean Javascript in an npm-compatible
@@ -45,6 +53,12 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
     @Parameter(defaultValue = "${project.basedir}/node_modules", property = "nodeModulesDir", required = false)
     private File nodeModulesDirectory;
 
+    /**
+     * Whether to log debugging info
+     */
+    @Parameter(defaultValue = "false", property = "debugLog", required = false)
+    private boolean debugLog = false;
+
     @Component
     protected DependencyGraphBuilder graphBuilder;
 
@@ -59,10 +73,20 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
             return;
         }
 
-        long start = System.currentTimeMillis();
-        List<MavenArtifact> artifacts = new ArrayList<>();
+        int copiedFiles = 0;
+
+        long start = System.currentTimeMillis(), last = start;
+        List<PackageJsonMavenArtifact> artifacts = new ArrayList<>();
         try {
-            collectBlueoceanDependencies(graphBuilder.buildDependencyGraph(project, null), artifacts);
+            DependencyNode dependencyGraph = graphBuilder.buildDependencyGraph(project, null);
+
+            if (debugLog || getLog().isDebugEnabled()) getLog().info("buildDependencyGraph took: " + (System.currentTimeMillis() - last));
+            last = System.currentTimeMillis();
+
+            collectBlueoceanDependencies(dependencyGraph, artifacts, new HashSet<URI>());
+
+            if (debugLog || getLog().isDebugEnabled()) getLog().info("collectBlueoceanDependencies took: " + (System.currentTimeMillis() - last));
+            last = System.currentTimeMillis();
 
             if (artifacts.isEmpty()) {
                 getLog().info("No upstream blueocean dependencies found for: " + project.getArtifactId());
@@ -79,17 +103,16 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
 
             getLog().info("Installing upstream dependencies...");
 
-            for (MavenArtifact artifact : artifacts) {
-                List<Contents> jarEntries = findJarEntries(artifact.getFile().toURI(), "package.json");
-
-                JSONObject packageJson = JSONObject.fromObject(new String(jarEntries.get(0).data, "utf-8"));
+            for (PackageJsonMavenArtifact jsonArtifact : artifacts) {
+                MavenArtifact artifact = jsonArtifact.getMavenArtifact();
+                JSONObject packageJson = jsonArtifact.getPackageJson();
 
                 String name = packageJson.getString("name");
                 String[] subdirs = name.split("/");
 
                 File outDir = nodeModulesDirectory;
-                for (String subdir : subdirs) {
-                    outDir = new File(outDir, subdir);
+                for (String subDir : subdirs) {
+                    outDir = new File(outDir, subDir);
                 }
 
                 File artifactFile = artifact.getFile();
@@ -101,10 +124,12 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                     }
                 }
 
+                if (debugLog || getLog().isDebugEnabled()) getLog().info("Processing artifact with package.json: " + artifact.getFile().toURI());
+
                 int read = 0;
                 byte[] buf = new byte[1024*8];
 
-                try (ZipInputStream jar = new ZipInputStream(new FileInputStream(artifact.getFile()))) {
+                try (ZipInputStream jar = new ZipInputStream(new BufferedInputStream(new FileInputStream(artifact.getFile())))) {
                     ZipEntry entry;
                     while ((entry = jar.getNextEntry()) != null) {
                         if (entry.isDirectory()) {
@@ -112,18 +137,24 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
                         }
                         File outFile = new File(outDir, entry.getName());
                         if (!outFile.exists() || outFile.lastModified() < artifactLastModified) {
-                            if (getLog().isDebugEnabled()) getLog().debug("Copying file: " + outFile.getAbsolutePath());
+                            if (debugLog || getLog().isDebugEnabled()) getLog().info("Copying file: " + outFile.getAbsolutePath());
                             File parentFile = outFile.getParentFile();
                             if (!parentFile.exists()) {
                                 if (!parentFile.mkdirs()) {
                                     throw new MojoExecutionException("Unable to make parent directory for: " + outFile.getCanonicalPath());
                                 }
                             }
-                            try (FileOutputStream out = new FileOutputStream(outFile)) {
+
+                            try (FileChannel fc = new RandomAccessFile(outFile, "rw").getChannel()) {
+                                ByteBuffer out = fc.map(FileChannel.MapMode.READ_WRITE, 0, entry.getSize());
                                 while ((read = jar.read(buf)) >= 0) {
-                                    out.write(buf, 0, read);
+                                    out.put(buf, 0, read);
                                 }
                             }
+
+                            copiedFiles++;
+                        } else {
+                            if (debugLog || getLog().isDebugEnabled()) getLog().info("Skipping file: " + outFile.getAbsolutePath() + " time difference: " + (outFile.lastModified() - artifactLastModified));
                         }
                     }
                 }
@@ -132,79 +163,87 @@ public class ProcessUpstreamDependenciesMojo extends AbstractJenkinsMojo {
             throw new RuntimeException(e);
         }
 
-        getLog().info("Done installing blueocean dependencies for " + project.getArtifactId() + " in " + (System.currentTimeMillis() - start) + "ms");
+        if (debugLog || getLog().isDebugEnabled()) getLog().info("Done installing blueocean dependencies for " + project.getArtifactId() + " in " + (System.currentTimeMillis() - last) + "ms");
+
+        getLog().info("Installed dependencies; " + copiedFiles + " files, took: " + (System.currentTimeMillis() - start) + "ms");
     }
 
     /**
      * Simple file as a byte array
      */
-    protected static class Contents {
-        public final String fileName;
-        public final byte[] data;
-        
-        Contents(@Nonnull String fileName, @Nonnull byte[] data) {
-            this.fileName = fileName;
-            this.data = data;
-        }
+    protected interface Contents {
+        String getFileName();
+        byte[] getData() throws IOException;
+    }
+
+    protected interface PackageJsonMavenArtifact {
+        JSONObject getPackageJson();
+        MavenArtifact getMavenArtifact();
     }
 
     /**
-     * Finds jar entries matching a path glob, e.g. **\/META-INF/*.properties
+     * Finds jar entries matching a specific path using the {@link FileSystem#getPathMatcher(String)} logic
      */
-    @Nonnull
-    private List<Contents> findJarEntries(@Nonnull URI jarFile, @Nonnull String pathGlob) throws IOException {
-        URL jarUrl = jarFile.toURL();
-        if (getLog().isDebugEnabled()) getLog().debug("Looking for " + pathGlob + " in " + jarFile + " with url: " + jarUrl);
-        List<Contents> out = new ArrayList<>();
-        Pattern matcher = Pattern.compile(
-            ("\\Q" + pathGlob.replace("**", "\\E\\Q").replace("*", "\\E[^/]*\\Q").replace("\\E\\Q", "\\E.*\\Q") + "\\E").replace("\\Q\\E", "")
-        );
-        try (ZipInputStream jar = new ZipInputStream(jarUrl.openStream())) {
-            for (ZipEntry entry; (entry = jar.getNextEntry()) != null;) {
-                if (getLog().isDebugEnabled()) getLog().debug("Entry: " + entry.getName() + ", matches: " + matcher.matcher(entry.getName()).matches());
-                if (matcher.matcher(entry.getName()).matches()) {
-                    out.add(new Contents(entry.getName(), IOUtils.toByteArray(jar)));
+    private Contents getJarEntry(@Nonnull URI jarFile, @Nonnull final String fileName) throws IOException {
+        try {
+            final URI fileUri = new URI("jar", jarFile.toString(),  null);
+            try (FileSystem fileSystem = FileSystems.newFileSystem(fileUri, Collections.EMPTY_MAP)) {
+                final Path source = fileSystem.getPath(fileName);
+                if (source != null) {
+                    final byte[] contents = Files.readAllBytes(source); // this is what fails with NoSuchFileException
+                    return new Contents() {
+                        public String getFileName() {
+                            return fileName;
+                        }
+                        public byte[] getData() throws IOException {
+                            return contents;
+                        }
+                    };
                 }
+            } catch(NoSuchFileException e) {
+                // no problem
             }
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
         }
-        return out;
+        return null;
     }
 
     /**
      * Collects all "blue ocean-like" upstream dependencies
      */
-    private void collectBlueoceanDependencies(@Nonnull DependencyNode node, @Nonnull List<MavenArtifact> results) {
-        MavenArtifact artifact = wrap(node.getArtifact());
-        boolean isLocalProject = node.getArtifact().equals(project.getArtifact());
-        try {
-            if (!isLocalProject) { // not the local project
-                if (getLog().isDebugEnabled()) getLog().debug("Testing artifact for Blue Ocean plugins: " + artifact.toString());
-                List<Contents> jarEntries = findJarEntries(artifact.getFile().toURI(), "package.json");
-                if (jarEntries.size() > 0) {
-                    getLog().info("Adding upstream Blue Ocean plugin: " + artifact.toString());
-                    results.add(artifact);
-                }
+    private void collectBlueoceanDependencies(@Nonnull DependencyNode node, @Nonnull List<PackageJsonMavenArtifact> results, @Nonnull Set<URI> visited) throws IOException {
+        final MavenArtifact artifact = wrap(node.getArtifact());
+        boolean addChildren = node.getArtifact().equals(project.getArtifact()); // always add children of local project
+        MavenArtifact packageJsonArtifact = null;
+        if (!addChildren) { // not the local project
+            URI jarUri = artifact.getFile().toURI();
+            if (visited.contains(jarUri)) {
+                return;
             }
-        } catch (IOException e) {
-            getLog().warn("Unable to find artifact: " + artifact, e);
-
-            MavenArtifact hpi = null;
-            try {
-                hpi = artifact.getHpi();
-                if (hpi != null) {
-                    List<Contents> jarEntries = findJarEntries(hpi.getFile().toURI(), "WEB-INF/lib/" + artifact.getArtifactId() + ".jar");
-                    if (jarEntries.size() > 0) {
-                        results.add(hpi);
+            visited.add(jarUri);
+            if (debugLog || getLog().isDebugEnabled()) getLog().info("Testing artifact for Blue Ocean plugins: " + artifact.toString());
+            Contents jarEntry = getJarEntry(jarUri, "package.json");
+            if (jarEntry != null) {
+                getLog().info("Adding upstream Blue Ocean plugin: " + artifact.toString());
+                addChildren = true;
+                final JSONObject packageJson = JSONObject.fromObject(new String(jarEntry.getData(), "utf-8"));
+                results.add(new PackageJsonMavenArtifact() {
+                    @Override
+                    public JSONObject getPackageJson() {
+                        return packageJson;
                     }
-                }
-            } catch (IOException e2) {
-                getLog().error("Unable to find hpi artifact for: " + hpi, e2);
+                    @Override
+                    public MavenArtifact getMavenArtifact() {
+                        return artifact;
+                    }
+                });
             }
         }
 
-        if (isLocalProject || !results.isEmpty()) { // only traverse up until we find a non-blue ocean project
+        if (addChildren) { // only traverse up until we find a non-blue ocean project
             for (DependencyNode child : node.getChildren()) {
-                collectBlueoceanDependencies(child, results);
+                collectBlueoceanDependencies(child, results, visited);
             }
         }
     }
