@@ -141,28 +141,28 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <version>2.5.3</version>
             </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>findbugs-maven-plugin</artifactId>
-                <version>3.0.4</version>
-                <configuration>
-                    <effort>Max</effort>
-                    <threshold>Default</threshold>
-                    <fork>false</fork>
-                    <xmlOutput>true</xmlOutput>
-                    <findbugsXmlOutput>false</findbugsXmlOutput>
-                    <excludeFilterFile>${project.basedir}/findbugs-excludes.xml</excludeFilterFile>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>analyze-compile</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+            <!--<plugin>-->
+                <!--<groupId>org.codehaus.mojo</groupId>-->
+                <!--<artifactId>findbugs-maven-plugin</artifactId>-->
+                <!--<version>3.0.4</version>-->
+                <!--<configuration>-->
+                    <!--<effort>Max</effort>-->
+                    <!--<threshold>Default</threshold>-->
+                    <!--<fork>false</fork>-->
+                    <!--<xmlOutput>true</xmlOutput>-->
+                    <!--<findbugsXmlOutput>false</findbugsXmlOutput>-->
+                    <!--<excludeFilterFile>${project.basedir}/findbugs-excludes.xml</excludeFilterFile>-->
+                <!--</configuration>-->
+                <!--<executions>-->
+                    <!--<execution>-->
+                        <!--<id>analyze-compile</id>-->
+                        <!--<phase>compile</phase>-->
+                        <!--<goals>-->
+                            <!--<goal>check</goal>-->
+                        <!--</goals>-->
+                    <!--</execution>-->
+                <!--</executions>-->
+            <!--</plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-invoker-plugin</artifactId>
@@ -171,9 +171,6 @@
                     <projectsDirectory>src/it</projectsDirectory>
                     <debug>true</debug>
                     <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
-                    <setupIncludes>
-                        <setupInclude>0-upstream-1/pom.xml</setupInclude>
-                    </setupIncludes>
                     <pomIncludes>
                         <pomInclude>*/pom.xml</pomInclude>
                     </pomIncludes>
@@ -195,6 +192,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -1,5 +1,5 @@
 {
-  "name": "no-deps",
+  "name": "downstream-plugin",
   "version": "0.0.139-SNAPSHOT",
   "description": "Shared JavaScript libraries for use with Jenkins Blue Ocean",
   "main": "dist/js/index.js",
